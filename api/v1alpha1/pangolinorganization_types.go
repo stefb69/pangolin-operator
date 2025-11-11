@@ -40,7 +40,7 @@ type OrganizationDefaults struct {
 	DefaultDomain string `json:"defaultDomain,omitempty"`
 }
 
-// Domain represents a Pangolin domain - NEW
+// Domain represents a Pangolin domain
 type Domain struct {
 	// Domain ID from Pangolin API
 	DomainID string `json:"domainId"`
@@ -75,10 +75,10 @@ type PangolinOrganizationStatus struct {
 	// Network subnet for this org from API
 	Subnet string `json:"subnet,omitempty"`
 
-	// Available domains for this organization - NEW
+	// Available domains for this organization
 	Domains []Domain `json:"domains,omitempty"`
 
-	// Default domain ID resolved from spec.defaults.defaultDomain - NEW
+	// Default domain ID resolved from spec.defaults.defaultDomain
 	DefaultDomainID string `json:"defaultDomainId,omitempty"`
 
 	// Binding mode: "Discovered" (auto-discovered) or "Bound" (explicitly bound)

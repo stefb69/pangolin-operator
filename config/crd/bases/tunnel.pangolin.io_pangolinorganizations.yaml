@@ -196,12 +196,11 @@ spec:
                 type: array
               defaultDomainId:
                 description: Default domain ID resolved from spec.defaults.defaultDomain
-                  - NEW
                 type: string
               domains:
-                description: Available domains for this organization - NEW
+                description: Available domains for this organization
                 items:
-                  description: Domain represents a Pangolin domain - NEW
+                  description: Domain represents a Pangolin domain
                   properties:
                     baseDomain:
                       description: Base domain (e.g., "yourdomain.com")

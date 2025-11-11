@@ -4,11 +4,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// SiteReference allows referencing a Pangolin site either by numeric ID or nice ID
+// Priority: SiteID takes precedence over NiceID if both are specified
+type SiteReference struct {
+	// SiteID is the numeric site identifier
+	// +optional
+	SiteID *int `json:"siteId,omitempty"`
+
+	// NiceID is the human-readable site identifier
+	// +optional
+	NiceID string `json:"niceId,omitempty"`
+}
+
 // PangolinResourceSpec defines the desired state of PangolinResource
 type PangolinResourceSpec struct {
 	// Reference to the tunnel this resource belongs to
-	// +kubebuilder:validation:Required
-	TunnelRef LocalObjectReference `json:"tunnelRef"`
+	// +optional
+	TunnelRef LocalObjectReference `json:"tunnelRef,omitempty"`
+
+	// SiteRef directly references a Pangolin site
+	// If specified, takes precedence over TunnelRef for site resolution
+	// +optional
+	SiteRef *SiteReference `json:"siteRef,omitempty"`
 
 	// Resource configuration for NEW resources
 	Name     string `json:"name,omitempty"`
@@ -84,16 +101,21 @@ type LocalObjectReference struct {
 }
 
 // PangolinResourceStatus defines the observed state of PangolinResource
+// PangolinResourceStatus defines the observed state of PangolinResource
 type PangolinResourceStatus struct {
 	// Resource ID from Pangolin API
 	ResourceID string `json:"resourceId,omitempty"`
-	// Target ID from Pangolin API
+
+	// DEPRECATED: Keep for backward compatibility but don't use
 	TargetID string `json:"targetId,omitempty"`
 
-	// Resolved domain ID from domain name - NEW
+	// All target IDs for this resource
+	TargetIDs []string `json:"targetIds,omitempty"`
+
+	// Resolved domain ID from domain name
 	ResolvedDomainID string `json:"resolvedDomainId,omitempty"`
 
-	// Full domain where resource is accessible - NEW
+	// Full domain where resource is accessible
 	FullDomain string `json:"fullDomain,omitempty"`
 
 	// Binding mode: "Created" or "Bound"
@@ -102,12 +124,16 @@ type PangolinResourceStatus struct {
 	// Current status: Creating, Ready, Error, Deleting, Waiting
 	// +kubebuilder:validation:Enum=Creating;Ready;Error;Deleting;Waiting
 	Status string `json:"status,omitempty"`
+
 	// Public URL for HTTP resources
 	URL string `json:"url,omitempty"`
+
 	// Proxy endpoint for TCP/UDP resources
 	ProxyEndpoint string `json:"proxyEndpoint,omitempty"`
+
 	// Conditions represent the latest available observations
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// ObservedGeneration reflects the generation most recently observed
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }

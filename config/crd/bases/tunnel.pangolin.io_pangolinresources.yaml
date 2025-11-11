@@ -114,6 +114,18 @@ spec:
                   BINDING MODE: Resource ID to bind to existing resource
                   If specified, will bind to existing resource instead of creating new one
                 type: string
+              siteRef:
+                description: |-
+                  SiteRef directly references a Pangolin site
+                  If specified, takes precedence over TunnelRef for site resolution
+                properties:
+                  niceId:
+                    description: NiceID is the human-readable site identifier
+                    type: string
+                  siteId:
+                    description: SiteID is the numeric site identifier
+                    type: integer
+                type: object
               target:
                 description: Target configuration
                 properties:
@@ -147,11 +159,11 @@ spec:
                 required:
                 - name
                 type: object
-            required:
-            - tunnelRef
             type: object
           status:
-            description: PangolinResourceStatus defines the observed state of PangolinResource
+            description: |-
+              PangolinResourceStatus defines the observed state of PangolinResource
+              PangolinResourceStatus defines the observed state of PangolinResource
             properties:
               bindingMode:
                 description: 'Binding mode: "Created" or "Bound"'
@@ -214,7 +226,7 @@ spec:
                   type: object
                 type: array
               fullDomain:
-                description: Full domain where resource is accessible - NEW
+                description: Full domain where resource is accessible
                 type: string
               observedGeneration:
                 description: ObservedGeneration reflects the generation most recently
@@ -225,7 +237,7 @@ spec:
                 description: Proxy endpoint for TCP/UDP resources
                 type: string
               resolvedDomainId:
-                description: Resolved domain ID from domain name - NEW
+                description: Resolved domain ID from domain name
                 type: string
               resourceId:
                 description: Resource ID from Pangolin API
@@ -240,8 +252,14 @@ spec:
                 - Waiting
                 type: string
               targetId:
-                description: Target ID from Pangolin API
+                description: 'DEPRECATED: Keep for backward compatibility but don''t
+                  use'
                 type: string
+              targetIds:
+                description: All target IDs for this resource
+                items:
+                  type: string
+                type: array
               url:
                 description: Public URL for HTTP resources
                 type: string

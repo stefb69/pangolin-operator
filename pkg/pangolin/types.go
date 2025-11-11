@@ -68,7 +68,6 @@ type Site struct {
 // ResourceCreateSpec defines the specification for creating a resource
 type ResourceCreateSpec struct {
 	Name     string `json:"name"`
-	SiteID   int    `json:"siteId"`
 	HTTP     bool   `json:"http"`
 	Protocol string `json:"protocol"`
 	// HTTP-specific fields
@@ -113,9 +112,23 @@ func (r *Resource) EffectiveID() string {
 
 // Target represents a Pangolin target
 type Target struct {
-	ID      string `json:"id"`
-	IP      string `json:"ip"`
-	Port    int32  `json:"port"`
-	Method  string `json:"method"`
-	Enabled bool   `json:"enabled"`
+	ID       string `json:"id,omitempty"`
+	TargetID int    `json:"targetId,omitempty"`
+	SiteID   int    `json:"siteId,omitempty"`
+	IP       string `json:"ip,omitempty"`
+	Port     int32  `json:"port,omitempty"`
+	Method   string `json:"method,omitempty"`
+	Enabled  bool   `json:"enabled,omitempty"`
+	Priority int    `json:"priority,omitempty"`
+}
+
+// EffectiveID returns the target ID as a string
+func (t *Target) EffectiveID() string {
+	if t.ID != "" {
+		return t.ID
+	}
+	if t.TargetID != 0 {
+		return strconv.Itoa(t.TargetID)
+	}
+	return ""
 }

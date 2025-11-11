@@ -12,14 +12,21 @@ import (
 	"time"
 )
 
-// Client represents a Pangolin API client
+// Client represents a Pangolin API client for interacting with the Pangolin platform.
+// It handles authentication, request construction, and response parsing for all API operations.
 type Client struct {
-	endpoint string
-	apiKey   string
-	client   *http.Client
+	endpoint string       // Base API endpoint URL (e.g., "https://api.pangolin.dobryops.com")
+	apiKey   string       // API key for authentication
+	client   *http.Client // HTTP client with configured timeout
 }
 
-// NewClient creates a new Pangolin API client
+// NewClient creates a new Pangolin API client with the specified endpoint and API key.
+//
+// Parameters:
+//   - endpoint: Base URL of the Pangolin API (e.g., "https://api.pangolin.dobryops.com")
+//   - apiKey: API key for authentication (obtained from Pangolin dashboard)
+//
+// The client is configured with a 30-second timeout for all requests.
 func NewClient(endpoint, apiKey string) *Client {
 	return &Client{
 		endpoint: endpoint,
@@ -30,17 +37,36 @@ func NewClient(endpoint, apiKey string) *Client {
 	}
 }
 
-// makeRequest makes an HTTP request to the Pangolin API
-func (c *Client) makeRequest(ctx context.Context, method, path string, body interface{}) (*http.Response, error) {
-	url := fmt.Sprintf("%s/v1%s", c.endpoint, path)
+// makeRequest constructs and executes an HTTP request to the Pangolin API.
+//
+// All requests are made to /v1/<path> with proper authentication headers.
+// Request bodies are automatically JSON-encoded if provided.
+//
+// Parameters:
+//   - ctx: Context for request cancellation and timeout
+//   - method: HTTP method (GET, POST, PUT, DELETE)
+//   - path: API path relative to /v1/ (e.g., "orgs", "org/my-org/sites")
+//   - body: Request body to be JSON-encoded (nil for no body)
+//
+// Returns:
+//   - HTTP response (caller must close response body)
+//   - Error if request construction or execution fails
+//
+// Request Headers:
+//   - Content-Type: application/json
+//   - Authorization: Bearer <apiKey>
+//   - User-Agent: pangolin-operator/1.0
+func (c Client) makeRequest(ctx context.Context, method, path string, body interface{}) (*http.Response, error) {
+	cleanPath := strings.TrimLeft(path, "/")
+	url := fmt.Sprintf("%s/v1/%s", strings.TrimRight(c.endpoint, "/"), cleanPath)
 
 	var reqBody []byte
-	var err error
 	if body != nil {
-		reqBody, err = json.Marshal(body)
+		b, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
+		reqBody = b
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(reqBody))
@@ -51,14 +77,19 @@ func (c *Client) makeRequest(ctx context.Context, method, path string, body inte
 	req.Header.Set("User-Agent", "pangolin-operator/1.0")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
-	}
-	return resp, nil
+	return c.client.Do(req)
 }
 
-// ListOrganizations retrieves all organizations
+// ListOrganizations retrieves all organizations accessible with the current API key.
+//
+// Returns:
+//   - Slice of Organization objects with ID, name, and subnet information
+//   - Error if request fails or API returns non-success status
+//
+// Used for:
+//   - Organization validation during binding
+//   - Organization discovery when no specific org is specified
+//   - Listing available organizations for selection
 func (c *Client) ListOrganizations(ctx context.Context) ([]Organization, error) {
 	resp, err := c.makeRequest(ctx, "GET", "/orgs", nil)
 	if err != nil {
@@ -86,7 +117,23 @@ func (c *Client) ListOrganizations(ctx context.Context) ([]Organization, error) 
 	return result.Data.Orgs, nil
 }
 
-// ListDomains retrieves all domains for an organization
+// ListDomains retrieves all domains configured for an organization.
+//
+// Domains are used for HTTP resource exposure, allowing resources to be accessed
+// via subdomains (e.g., app.mydomain.com).
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - orgID: Organization ID to query domains for
+//
+// Returns:
+//   - Slice of Domain objects with ID, base domain, verification status, and configuration
+//   - Error if request fails or organization not found
+//
+// Domain Types:
+//   - Verified: Domains that have been verified and are ready for use
+//   - Unverified: Domains pending DNS verification
+//   - Failed: Domains that failed verification
 func (c *Client) ListDomains(ctx context.Context, orgID string) ([]Domain, error) {
 	path := fmt.Sprintf("/org/%s/domains?limit=1000&offset=0", orgID)
 	resp, err := c.makeRequest(ctx, "GET", path, nil)
@@ -115,7 +162,23 @@ func (c *Client) ListDomains(ctx context.Context, orgID string) ([]Domain, error
 	return result.Data.Domains, nil
 }
 
-// ListSites retrieves all sites for an organization
+// ListSites retrieves all sites (tunnel endpoints) for an organization.
+//
+// Sites represent physical or virtual locations where resources can be deployed.
+// Each site has a tunnel client that connects to the Pangolin platform.
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - orgID: Organization ID to query sites for
+//
+// Returns:
+//   - Slice of Site objects with ID, name, type, and status information
+//   - Error if request fails or organization not found
+//
+// Site Types:
+//   - newt: Newt protocol tunnel (recommended)
+//   - wireguard: WireGuard VPN tunnel
+//   - other: Custom tunnel implementations
 func (c *Client) ListSites(ctx context.Context, orgID string) ([]Site, error) {
 	path := fmt.Sprintf("/org/%s/sites?limit=1000&offset=0", orgID)
 	resp, err := c.makeRequest(ctx, "GET", path, nil)
@@ -144,7 +207,17 @@ func (c *Client) ListSites(ctx context.Context, orgID string) ([]Site, error) {
 	return result.Data.Sites, nil
 }
 
-// GetSiteByID retrieves a site by numeric siteId
+// GetSiteByID retrieves a specific site by its numeric site ID.
+//
+// This is the primary method for binding to existing sites when the numeric ID is known.
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - siteID: Numeric site identifier
+//
+// Returns:
+//   - Site object with complete site information
+//   - Error if site not found or request fails
 func (c *Client) GetSiteByID(ctx context.Context, siteID int) (*Site, error) {
 	resp, err := c.makeRequest(ctx, "GET", fmt.Sprintf("/site/%d", siteID), nil)
 	if err != nil {
@@ -170,7 +243,19 @@ func (c *Client) GetSiteByID(ctx context.Context, siteID int) (*Site, error) {
 	return &result.Data, nil
 }
 
-// GetSiteByNiceID retrieves a site by orgId and niceId
+// GetSiteByNiceID retrieves a specific site by its human-readable nice ID.
+//
+// Nice IDs are automatically generated human-readable identifiers (e.g., "happy-brave-tiger").
+// This method requires both organization ID and nice ID as nice IDs are only unique within an org.
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - orgID: Organization ID that owns the site
+//   - niceID: Human-readable site identifier
+//
+// Returns:
+//   - Site object with complete site information
+//   - Error if site not found or request fails
 func (c *Client) GetSiteByNiceID(ctx context.Context, orgID, niceID string) (*Site, error) {
 	path := fmt.Sprintf("/org/%s/site/%s", orgID, niceID)
 	resp, err := c.makeRequest(ctx, "GET", path, nil)
@@ -197,7 +282,23 @@ func (c *Client) GetSiteByNiceID(ctx context.Context, orgID, niceID string) (*Si
 	return &result.Data, nil
 }
 
-// CreateSite creates a new site
+// CreateSite creates a new site within an organization.
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - orgID: Organization ID to create the site in
+//   - name: Display name for the site
+//   - siteType: Type of site/tunnel to create (e.g., "newt", "wireguard")
+//
+// Returns:
+//   - Site object with the created site's information including assigned IDs
+//   - Error if creation fails or site with same name already exists
+//
+// Site Creation:
+//   - Generates unique numeric siteId
+//   - Generates unique human-readable niceId
+//   - Allocates network subnet for the site
+//   - Returns tunnel credentials (for newt sites)
 func (c *Client) CreateSite(ctx context.Context, orgID, name, siteType string) (*Site, error) {
 	body := map[string]interface{}{
 		"name": name,
@@ -228,76 +329,259 @@ func (c *Client) CreateSite(ctx context.Context, orgID, name, siteType string) (
 	return &result.Data, nil
 }
 
-// CreateResource creates a new resource in Pangolin
+// CreateResource creates a new resource at the organization level.
+//
+// Resources represent services to be exposed through Pangolin. They are created at the
+// organization level as abstract definitions, then linked to concrete backends via targets.
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - orgID: Organization ID to create the resource in
+//   - siteID: Site ID for target association (can be empty for HTTP resources)
+//   - spec: Resource specification including name, protocol, and configuration
+//
+// Returns:
+//   - Resource object with assigned resource ID
+//   - Error if creation fails or invalid configuration provided
+//
+// Resource Types:
+//
+// HTTP Resources (spec.HTTP = true):
+//   - Requires: subdomain, domainId
+//   - Exposed via HTTPS at subdomain.domain
+//   - Automatically provisions SSL certificates
+//
+// TCP/UDP Resources (spec.HTTP = false):
+//   - Requires: proxyPort, enableProxy
+//   - Exposed via TCP/UDP proxy
+//   - No SSL termination
+//
+// Resource Architecture:
+//   - Resource: Abstract definition at org level
+//   - Target: Concrete backend at site level
+//   - One resource can have multiple targets for load balancing
 func (c *Client) CreateResource(ctx context.Context, orgID, siteID string, spec ResourceCreateSpec) (*Resource, error) {
 	data := map[string]interface{}{
 		"name":     spec.Name,
-		"siteId":   spec.SiteID,
 		"http":     spec.HTTP,
 		"protocol": spec.Protocol,
 	}
+
+	// Add HTTP-specific fields
 	if spec.HTTP {
-		data["subdomain"] = spec.Subdomain
+		if spec.Subdomain != "" {
+			data["subdomain"] = spec.Subdomain
+		}
 		if spec.DomainID != "" {
 			data["domainId"] = spec.DomainID
 		}
 	} else {
-		data["proxyPort"] = spec.ProxyPort
-		data["enableProxy"] = spec.EnableProxy
+		// Add TCP/UDP proxy fields
+		if spec.ProxyPort > 0 {
+			data["proxyPort"] = spec.ProxyPort
+		}
+		if spec.EnableProxy {
+			data["enableProxy"] = spec.EnableProxy
+		}
 	}
 
-	resp, err := c.makeRequest(ctx, "PUT", fmt.Sprintf("/org/%s/site/%s/resource", orgID, siteID), data)
+	// Always use org-level endpoint for resource creation
+	path := fmt.Sprintf("/org/%s/resource", orgID)
+
+	resp, err := c.makeRequest(ctx, "PUT", path, data)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	// Guard against HTML error pages so JSON decoder doesn't fail with '<'
-	if ct := resp.Header.Get("Content-Type"); ct == "" || !strings.HasPrefix(ct, "application/json") {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("unexpected content-type %q (status %d): %s", ct, resp.StatusCode, string(b))
+	// Read full response for error handling
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	// Validate content type
+	ct := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "application/json") {
+		return nil, fmt.Errorf("unexpected content-type %q status %d: %s", ct, resp.StatusCode, string(bodyBytes))
+	}
+
+	// Parse response
 	var result struct {
-		Success bool     `json:"success"`
-		Data    Resource `json:"data"`
+		Success bool        `json:"success"`
+		Data    Resource    `json:"data"`
+		Error   interface{} `json:"error,omitempty"`
+		Message string      `json:"message,omitempty"`
+		Status  int         `json:"status,omitempty"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w, body: %s", err, string(bodyBytes))
 	}
 
-	// Normalize ID from resourceId when id is empty (matches Integration API response)
-	if result.Data.ID == "" && result.Data.ResourceID > 0 {
+	// Enhanced error handling with API message
+	if !result.Success {
+		errMsg := "API request was not successful"
+		if result.Message != "" {
+			errMsg = fmt.Sprintf("%s: %s", errMsg, result.Message)
+		}
+		if result.Status > 0 {
+			errMsg = fmt.Sprintf("%s (status: %d)", errMsg, result.Status)
+		}
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	// Normalize ID field (API may return either 'id' or 'resourceId')
+	if result.Data.ID == "" && result.Data.ResourceID != 0 {
 		result.Data.ID = strconv.Itoa(result.Data.ResourceID)
 	}
+
 	return &result.Data, nil
 }
 
-// CreateTarget creates a target for a resource
-func (c *Client) CreateTarget(ctx context.Context, resourceID string, spec TargetCreateSpec) (*Target, error) {
+// CreateTarget creates a target (backend) for a resource at a specific site.
+//
+// Targets link abstract resources to concrete backend services. A resource can have
+// multiple targets for load balancing or multi-site deployments.
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - resourceID: Resource ID to create target for
+//   - siteID: Site ID where the backend exists (associates target with site)
+//   - spec: Target specification including IP, port, method, and enabled state
+//
+// Returns:
+//   - Target object with assigned target ID
+//   - Error if creation fails or duplicate target exists
+//
+// Target Specification:
+//   - IP: Backend IP address (can be internal cluster IP)
+//   - Port: Backend port number
+//   - Method: Protocol method (http, https, tcp, udp)
+//   - Enabled: Whether target should receive traffic
+//   - SiteID: Associates target with specific site for routing
+//
+// Target Matching:
+//   - Targets are unique per (IP, port, method, siteID) combination
+//   - Creating duplicate target returns "already exists" error
+//   - Use ListTargets to check for existing targets before creating
+func (c *Client) CreateTarget(ctx context.Context, resourceID, siteID string, spec TargetCreateSpec) (*Target, error) {
 	data := map[string]interface{}{
 		"ip":      spec.IP,
 		"port":    spec.Port,
 		"method":  spec.Method,
 		"enabled": spec.Enabled,
 	}
-	resp, err := c.makeRequest(ctx, "PUT", fmt.Sprintf("/resource/%s/target", resourceID), data)
+
+	// Add siteID to associate target with site
+	if siteID != "" {
+		data["siteId"] = mustParseInt(siteID)
+	}
+
+	resp, err := c.makeRequest(ctx, "PUT", fmt.Sprintf("resource/%s/target", resourceID), data)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if ct := resp.Header.Get("Content-Type"); ct == "" || !strings.HasPrefix(ct, "application/json") {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("unexpected content-type %q (status %d): %s", ct, resp.StatusCode, string(b))
+	// Read full response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	// Validate content type
+	ct := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "application/json") {
+		return nil, fmt.Errorf("unexpected content-type %q status %d: %s", ct, resp.StatusCode, string(bodyBytes))
+	}
+
+	// Parse response
 	var result struct {
 		Success bool   `json:"success"`
 		Data    Target `json:"data"`
+		Message string `json:"message,omitempty"`
+		Status  int    `json:"status,omitempty"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode target response: %w, body: %s", err, string(bodyBytes))
+	}
+
+	if !result.Success {
+		errMsg := "API request was not successful"
+		if result.Message != "" {
+			errMsg = fmt.Sprintf("%s: %s", errMsg, result.Message)
+		}
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	return &result.Data, nil
+}
+
+// ListTargets retrieves all targets (backends) for a specific resource.
+//
+// Used for:
+//   - Checking if target already exists before creation (idempotency)
+//   - Discovering all backends for a resource
+//   - Tracking manually added targets via UI
+//   - Multi-target management and load balancing
+//
+// Parameters:
+//   - ctx: Context for request cancellation
+//   - resourceID: Resource ID to query targets for
+//
+// Returns:
+//   - Slice of Target objects with ID, IP, port, method, and site association
+//   - Error if request fails or resource not found
+//
+// Target List Uses:
+//   - Idempotency: Check before creating to avoid duplicates
+//   - Discovery: Find all backends including manually added ones
+//   - Monitoring: Track target health and availability
+func (c *Client) ListTargets(ctx context.Context, resourceID string) ([]Target, error) {
+	path := fmt.Sprintf("resource/%s/targets?limit=1000&offset=0", resourceID)
+	resp, err := c.makeRequest(ctx, "GET", path, nil)
+	if err != nil {
 		return nil, err
 	}
-	return &result.Data, nil
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "application/json") {
+		return nil, fmt.Errorf("unexpected content-type %q status %d: %s", ct, resp.StatusCode, string(bodyBytes))
+	}
+
+	var result struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Targets []Target `json:"targets"`
+		} `json:"data"`
+		Message string `json:"message,omitempty"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w, body: %s", err, string(bodyBytes))
+	}
+
+	if !result.Success {
+		errMsg := "API request was not successful"
+		if result.Message != "" {
+			errMsg = fmt.Sprintf("%s: %s", errMsg, result.Message)
+		}
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	return result.Data.Targets, nil
+}
+
+// mustParseInt converts a string to an integer, returning 0 on error.
+// Used for parsing site IDs and other numeric identifiers from string format.
+func mustParseInt(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
 }
