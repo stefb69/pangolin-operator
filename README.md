@@ -96,14 +96,13 @@ PangolinBinding (Service Binding)
 
 ### Prerequisites
 
-- Kubernetes cluster (v1.11.3+)
+- Kubernetes cluster (v1.20+)
 - `kubectl` configured for your cluster
-- Docker (for building custom images)
 - Access to a Pangolin organization and API key
 
 ### Installation
 
-1. **Install the CRDs:**
+1. **Install CRDs:**
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/bovf/pangolin-operator/main/config/crd/bases/tunnel.pangolin.io_pangolinorganizations.yaml
 kubectl apply -f https://raw.githubusercontent.com/bovf/pangolin-operator/main/config/crd/bases/tunnel.pangolin.io_pangolintunnels.yaml
@@ -112,71 +111,82 @@ kubectl apply -f https://raw.githubusercontent.com/bovf/pangolin-operator/main/c
 ```
 
 2. **Deploy the operator:**
+
+For production (once available):
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/bovf/pangolin-operator/main/dist/install.yaml
 ```
 
-3. **Create your API key secret:**
+For development:
+```bash
+git clone https://github.com/bovf/pangolin-operator.git
+cd pangolin-operator
+make deploy IMG=your-registry/pangolin-operator:tag
+```
+
+3. **Create API key secret:**
 ```bash
 kubectl create secret generic pangolin-credentials \
-  --from-literal=apiKey=your-pangolin-api-key
+  --from-literal=apiKey=your-pangolin-api-key \
+  -n default
 ```
 
 ### Basic Usage
 
-#### 1. Create a Pangolin Organization
+#### 1. Create a PangolinOrganization
 ```yaml
 apiVersion: tunnel.pangolin.io/v1alpha1
 kind: PangolinOrganization
 metadata:
   name: my-org
+  namespace: default
 spec:
-  organizationId: "your-org-id"  # Optional: auto-discovered if omitted
-  apiEndpoint: "https://api.yourpangolinisntance.com"
+  organizationId: "your-org-id"
+  apiEndpoint: "https://api.pangolin.yourdomain.com"
   apiKeyRef:
     name: pangolin-credentials
     key: apiKey
   defaults:
-    defaultDomain: "yourdomain.com"  # Optional: use specific domain
+    defaultDomain: "yourdomain.com"
     siteType: "newt"
 ```
 
-#### 2. Create a Tunnel (New Site)
+#### 2. Bind a Tunnel
 ```yaml
 apiVersion: tunnel.pangolin.io/v1alpha1
 kind: PangolinTunnel
 metadata:
   name: my-tunnel
+  namespace: default
 spec:
   organizationRef:
     name: my-org
   siteName: "k8s-cluster"
   siteType: "newt"
-  # siteId: 123  # Optional: bind to existing site
 ```
 
-#### 3. Create HTTP Resource (Expose Web App)
+#### 3. Expose an HTTP Service
 ```yaml
 apiVersion: tunnel.pangolin.io/v1alpha1
 kind: PangolinResource
 metadata:
-  name: my-web-app
+  name: my-app
+  namespace: default
 spec:
   tunnelRef:
     name: my-tunnel
-  name: "my-webapp"
+  name: "my-app"
   protocol: "http"
   httpConfig:
     subdomain: "app"
-    # domainName: "yourdomain.com"  # Optional: specify domain
-    # domainId: "domain1"           # Optional: use domain ID
+    # Automatically uses organization's default domain
   target:
     ip: "my-service.default.svc.cluster.local"
     port: 80
     method: "http"
 ```
 
-**Result**: Your app will be available at `https://app.yourdomain.com`
+**Access your app:** `https://app.yourdomain.com`
 
 #### 4. Create TCP Resource (Database Proxy)
 ```yaml
