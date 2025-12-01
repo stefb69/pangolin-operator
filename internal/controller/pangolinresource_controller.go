@@ -303,11 +303,13 @@ func (r *PangolinResourceReconciler) reconcilePangolinResource(
 		resource.Status.FullDomain = fullDomain
 
 		resSpec = pangolin.ResourceCreateSpec{
-			Name:      resource.Spec.Name,
-			HTTP:      true,
-			Protocol:  "tcp",
-			Subdomain: resource.Spec.HTTPConfig.Subdomain,
-			DomainID:  domainID,
+			Name:        resource.Spec.Name,
+			HTTP:        true,
+			Protocol:    "tcp",
+			Subdomain:   resource.Spec.HTTPConfig.Subdomain,
+			DomainID:    domainID,
+			SSO:         resource.Spec.HTTPConfig.SSO,
+			BlockAccess: resource.Spec.HTTPConfig.BlockAccess,
 		}
 	} else if resource.Spec.ProxyConfig != nil {
 		// TCP/UDP resource with proxy configuration

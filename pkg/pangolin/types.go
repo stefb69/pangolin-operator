@@ -71,8 +71,10 @@ type ResourceCreateSpec struct {
 	HTTP     bool   `json:"http"`
 	Protocol string `json:"protocol"`
 	// HTTP-specific fields
-	Subdomain string `json:"subdomain,omitempty"`
-	DomainID  string `json:"domainId,omitempty"`
+	Subdomain   string `json:"subdomain,omitempty"`
+	DomainID    string `json:"domainId,omitempty"`
+	SSO         bool   `json:"sso,omitempty"`
+	BlockAccess bool   `json:"blockAccess,omitempty"`
 	// TCP/UDP-specific fields
 	ProxyPort   int32 `json:"proxyPort,omitempty"`
 	EnableProxy bool  `json:"enableProxy,omitempty"`

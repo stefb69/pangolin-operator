@@ -73,6 +73,11 @@ spec:
               httpConfig:
                 description: HTTP-specific configuration
                 properties:
+                  blockAccess:
+                    description: |-
+                      BlockAccess blocks access until user is authenticated
+                      Only effective when SSO is enabled
+                    type: boolean
                   domainId:
                     description: 'OPTION 1: Domain ID to use (e.g., "domain1")'
                     type: string
@@ -81,6 +86,9 @@ spec:
                       OPTION 2: Domain name to use (e.g., "yourdomain.com") - NEW
                       If specified, will be resolved to domainId by the operator
                     type: string
+                  sso:
+                    description: SSO enables SSO authentication for this resource
+                    type: boolean
                   subdomain:
                     description: Subdomain for this resource
                     minLength: 1
