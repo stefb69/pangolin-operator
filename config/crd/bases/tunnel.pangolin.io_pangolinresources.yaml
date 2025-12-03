@@ -134,31 +134,53 @@ spec:
                     description: SiteID is the numeric site identifier
                     type: integer
                 type: object
-              target:
-                description: Target configuration
-                properties:
-                  ip:
-                    description: Target IP or hostname
-                    type: string
-                  method:
-                    default: http
-                    description: Target method/protocol
-                    enum:
-                    - http
-                    - https
-                    - tcp
-                    - udp
-                    type: string
-                  port:
-                    description: Target port
-                    format: int32
-                    maximum: 65535
-                    minimum: 1
-                    type: integer
-                required:
-                - ip
-                - port
-                type: object
+              targets:
+                description: Targets configuration - multiple targets for path-based
+                  routing
+                items:
+                  description: TargetConfig defines the backend target
+                  properties:
+                    ip:
+                      description: Target IP or hostname
+                      type: string
+                    method:
+                      default: http
+                      description: Target method/protocol
+                      enum:
+                      - http
+                      - https
+                      - tcp
+                      - udp
+                      type: string
+                    path:
+                      description: Path to match for routing (e.g., "/api")
+                      type: string
+                    pathMatchType:
+                      description: 'PathMatchType defines how to match the path: exact,
+                        prefix, or regex'
+                      enum:
+                      - exact
+                      - prefix
+                      - regex
+                      type: string
+                    port:
+                      description: Target port
+                      format: int32
+                      maximum: 65535
+                      minimum: 1
+                      type: integer
+                    priority:
+                      default: 100
+                      description: Priority for path matching (higher = matched first)
+                      format: int32
+                      maximum: 1000
+                      minimum: 1
+                      type: integer
+                  required:
+                  - ip
+                  - port
+                  type: object
+                type: array
               tunnelRef:
                 description: Reference to the tunnel this resource belongs to
                 properties:
@@ -180,6 +202,10 @@ spec:
               bindingMode:
                 description: 'Binding mode: "Created" or "Bound"'
                 type: string
+              blockAccessEnabled:
+                description: BlockAccessEnabled indicates if access is blocked until
+                  authenticated
+                type: boolean
               conditions:
                 description: Conditions represent the latest available observations
                 items:
@@ -254,6 +280,10 @@ spec:
               resourceId:
                 description: Resource ID from Pangolin API
                 type: string
+              ssoEnabled:
+                description: SSOEnabled indicates if SSO authentication is enabled
+                  for this resource
+                type: boolean
               status:
                 description: 'Current status: Creating, Ready, Error, Deleting, Waiting'
                 enum:
@@ -263,6 +293,10 @@ spec:
                 - Deleting
                 - Waiting
                 type: string
+              targetCount:
+                description: TargetCount is the number of targets configured for this
+                  resource
+                type: integer
               targetId:
                 description: 'DEPRECATED: Keep for backward compatibility but don''t
                   use'

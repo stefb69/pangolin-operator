@@ -80,12 +80,23 @@ type ResourceCreateSpec struct {
 	EnableProxy bool  `json:"enableProxy,omitempty"`
 }
 
+// ResourceUpdateSpec defines the specification for updating a resource
+// Uses pointers to distinguish between "not set" and "set to false"
+type ResourceUpdateSpec struct {
+	SSO         *bool `json:"sso,omitempty"`
+	BlockAccess *bool `json:"blockAccess,omitempty"`
+	Enabled     *bool `json:"enabled,omitempty"`
+}
+
 // TargetCreateSpec defines the specification for creating a target
 type TargetCreateSpec struct {
-	IP      string `json:"ip"`
-	Port    int32  `json:"port"`
-	Method  string `json:"method"`
-	Enabled bool   `json:"enabled"`
+	IP            string `json:"ip"`
+	Port          int32  `json:"port"`
+	Method        string `json:"method"`
+	Enabled       bool   `json:"enabled"`
+	Path          string `json:"path,omitempty"`
+	PathMatchType string `json:"pathMatchType,omitempty"`
+	Priority      int32  `json:"priority,omitempty"`
 }
 
 // Resource represents a Pangolin resource
@@ -98,7 +109,11 @@ type Resource struct {
 	HTTP       bool   `json:"http"`
 	Protocol   string `json:"protocol"`
 	Subdomain  string `json:"subdomain,omitempty"`
+	DomainID   string `json:"domainId,omitempty"`
+	FullDomain string `json:"fullDomain,omitempty"`
 	Enabled    bool   `json:"enabled"`
+	SSO        bool   `json:"sso"`
+	BlockAccess bool  `json:"blockAccess"`
 }
 
 // EffectiveID returns a string identifier usable in URL paths.

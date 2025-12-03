@@ -41,8 +41,9 @@ type PangolinResourceSpec struct {
 	// TCP/UDP-specific configuration
 	ProxyConfig *ProxyConfig `json:"proxyConfig,omitempty"`
 
-	// Target configuration
-	Target TargetConfig `json:"target,omitempty"`
+	// Targets configuration - multiple targets for path-based routing
+	// +optional
+	Targets []TargetConfig `json:"targets,omitempty"`
 
 	// Enable/disable this resource
 	// +kubebuilder:default=true
@@ -101,6 +102,19 @@ type TargetConfig struct {
 	// +kubebuilder:validation:Enum=http;https;tcp;udp
 	// +kubebuilder:default="http"
 	Method string `json:"method,omitempty"`
+	// Path to match for routing (e.g., "/api")
+	// +optional
+	Path string `json:"path,omitempty"`
+	// PathMatchType defines how to match the path: exact, prefix, or regex
+	// +kubebuilder:validation:Enum=exact;prefix;regex
+	// +optional
+	PathMatchType string `json:"pathMatchType,omitempty"`
+	// Priority for path matching (higher = matched first)
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1000
+	// +kubebuilder:default=100
+	// +optional
+	Priority int32 `json:"priority,omitempty"`
 }
 
 // LocalObjectReference contains enough information to locate a resource
@@ -149,6 +163,15 @@ type PangolinResourceStatus struct {
 
 	// ObservedGeneration reflects the generation most recently observed
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// SSOEnabled indicates if SSO authentication is enabled for this resource
+	SSOEnabled bool `json:"ssoEnabled,omitempty"`
+
+	// BlockAccessEnabled indicates if access is blocked until authenticated
+	BlockAccessEnabled bool `json:"blockAccessEnabled,omitempty"`
+
+	// TargetCount is the number of targets configured for this resource
+	TargetCount int `json:"targetCount,omitempty"`
 }
 
 //+kubebuilder:object:root=true
